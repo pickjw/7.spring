@@ -1,0 +1,243 @@
+4.spring의 어노테이션 작성및 Spring MVC 개요 및작성법
+
+                <dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>4.2.5.RELEASE</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-expression</artifactId>
+			<version>4.2.5.RELEASE</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-beans</artifactId>
+			<version>4.2.5.RELEASE</version>
+		</dependency>
+		
+		<!--spring-jdbc  -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<version>4.2.5.RELEASE</version>
+		</dependency>
+	==============================================
+  spring-jdbc =>스프링에서 DB연동에 관여하는 클래스,인터페이스
+  +mysql,oracle,,,,=>드라이브 다운로드->spring maven mysql 검색
+
+<!-- @Required,@Autowired,@Resource 때문에 필요(xml에 등록) -->
+<bean class="org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor" />
+<bean class="org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor" />
+<bean class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor" />
+
+->다음과 같은 멤버변수와 관련된 에러메세지를 출력시켜준다.
+
+nested exception is org.springframework.beans.factory.BeanInitializationException:
+ Property 'number' is required for bean 'camera1'
+
+=>@Required 어노테이션의 기능->setNumber를 호출했는지 안했는지를 체크
+                               해주는 기능을 가지고 있다.
+====================================================================
+p103 p104 105->@Autowired(구버전)=>@Inject(신버전)와 기능이 동일
+p111 @Resource p112 @Inject
+p115~116 @Component p118~119
+
+ ->7장 Spring webMVC
+=============================================
+ 웹 p279  @Controller, @RequestMapping/Model
+    p283  p295 @RequestParam->request.getParameter("필드명")
+~
+============================================================
+
+
+
+어노테이션은 한개이상 겹쳐서 나올 수가 있다.(특징)
+
+<bean id="moniter"  class="anno2.SystemMoniter" >
+    <!-- 
+    <property name="periodTime"  value="20" /> =>p:periodTime="20"
+    <property name="sender" ref="sender" />    =>p:sender-ref="sender"
+    -->
+</bean>
+
+moniter=>SystemMoniter[periodTime=0,sender=null]
+
+  ***********************************************                                         
+               @Autowired=>특징=>@Inject
+
+                       1.생성자,멤버변수(=속성),메서드에 지정이 가능
+                       2.메서드명위에 @Autowired를 부여
+                         이 메서드를 호출하면서 매개변수가 의존성객체를 
+                         자동으로 얻어서 넣어준다.(멤버변수에)
+
+                           xml에 <property>태그 또는 <p:멤버변수-ref="~">
+                                    생략해도 호출한다.
+                         3.Setter Method외에 다른 메서드에서 동일하게 적용이 된다.
+                         4.해당하는 빈즈객체가 없거나 두개이상 존재시 에러가 유발
+                         NoSuchBeanDefinitionException: No qualifying bean of type [com.spring.anno2.SmsSender] found for dependency: expected at least 1 bean which qualifies as autowire candidate for this dependency. Dependency annotations: {@org.springframework.beans.factory.annotation.Autowired(required=true)}
+                            
+                            ->xml에 빈즈가 등록X
+                             @어노테이션(속성명=속성값)
+                            =>디폴트 설정=>Autowired(required=true)
+                                                    무조건 가져와라는 옵션
+                             =>@Autowired(required=false)
+                                                      추가옵션
+    ============================================================
+        @Autowired(required=false)
+	private SmsSender sender;
+ 
+    =>SmsSender클래스의 객체를 자동으로 가져와서 sender멤버변수에
+      넣어주는 어노테이션이다 그러나 만약에 SmsSender라는 클래스의
+      객체가 없다면 객체를 저장하지 않게 설정하는 옵션(null)
+    ==============================================================
+
+
+               =>@Inject -------->@Injectable(앵글러)
+                   pom.xml에 기술
+
+                   <!--  @Inject때문에 -->
+		<dependency>
+			<groupId>javax.inject</groupId>
+			<artifactId>javax.inject</artifactId>
+			<version>1</version>
+		</dependency>
+                    -------------------------------------------------------
+                    @Autowired(구)->대신에 @Inject (최신) 사용하면 된다.
+                    ----------------------------------------------------------
+
+
+	@Required =>반드시 호출했는지 안했는지를 체크해주는 기능
+	public void setSender(SmsSender sender) {
+		this.sender = sender;
+		System.out.println("setSender()호출됨=>"+sender);
+	}
+-----------------------------------------------------------------------
+public class HomeController {
+
+	@Resource(name="camera2")
+	private Camera camera2;//new Camera()->xml에서 설정
+	
+	private Camera camera3;
+	private Camera camera4;
+	/*
+	 * @Resource(name="빈즈의 구분자id값")->멤버변수에 설정
+	 *  ->setXXX메서드 생략이 가능하다.->자동으로 연결할 의존객체를 얻어올때사용
+	 * 
+	 */
+	
+	//setCamera2()를 안만든 이유
+	@Resource(name="camera3")
+	public void setCamera3(Camera camera3) {
+		this.camera3 = camera3;
+		System.out.println("setCamera3()호출됨!");
+	}
+	
+	@Resource(name="camera4")
+	public void setCamera4(Camera camera4) {
+		this.camera4 = camera4;
+		System.out.println("setCamera4()호출됨!");
+	}
+	
+	@Override
+	public String toString() {
+		// TODO Auto-generated method stub
+		return "HomeController[camera2="+camera2+",camera3="+camera3
+				    +",camera4="+camera4+"]";
+	}
+======================================================================
+
+실행결과
+
+setNumber() 호출
+setNumber() 호출
+setNumber() 호출
+setCamera3()호출됨!
+setCamera4()호출됨!
+home=>HomeController[camera2=설치된 카메라(Camera)수[numaber=2],
+ camera3=설치된 카메라(Camera)수[numaber=3],camera4=설치된 카메라(Camera)수[numaber=4]]
+
+** 차이점 **
+
+  Autowired를 이용-->객체를 가져오는 경우 기준점  by Type
+  Resource를  이용--->객체를 가져오는 경우 기준점 by Name  by Name(id값으로)
+
+** 공통점 **
+  둘다 의존객체를 자동으로 인식해서 멤버변수에 넣어준다.->propety태그 없이
+
+==================================================================
+  anno4
+
+<bean id="homeController2"  class="anno4.HomeController2"
+      factory-method="test(정적메서드 이름)" />
+      ==============
+ 
+      ** 정적메서드를 작성할때 주의 **
+
+       1.반환형의 객체가 존재해야 된다.
+       2.반환형의 객체의 자료형=>anno4.HomeController2
+
+   //추가
+	 /*public static void test() {
+		 System.out.println("정적메서드 호출(test())");
+		 반환형값이 존재(객체형)
+	 }*/
+	 
+	 public static HomeController2 test() {
+		 return new HomeController2();
+	 }
+
+
+  anno5
+
+   Camera
+   Main
+   HomeController2
+
+  app.xml->save as app2Scan.xml
+
+ xml에서 특정 자바빈즈를 객체를 생성할려면
+
+ <bean id="camera"  class="anno5.Camera" /> 이런식으로 xml에 추가
+ ->다른 방법으로 똑같이 사용할 수있다.
+
+ ->@Component 어노테이션을 이용->스프링 컨테이너 검색->검색범위를 지정
+
+ 검색->클래스가 들어있는 폴더를 지정
+
+  @Component  => <bean id="camera"  class="anno5.Camera" />
+  class Camera
+
+
+  @Component  => <bean id="t"  class="anno5.Test" />
+  class Test
+
+  class ABC
+  ,,,
+--------------------------------------------------------------------
+<context:component-scan base-package="빈즈클래스의 객체로 등록시킬
+                                      패키지명(상위패키지명.하위패키지)" />
+<context:component-scan base-package="anno5" />
+
+@Component=================>스프링컨테이너 HomeController2클래스
+                            객체를 만들어서 저장을 하는데
+ class HomeController2{      Main에서는 기본적으로 클래스이름을 기본
+                             으로 가져온다.
+                             getBean("homeController2")
+}
+
+******************************************************************
+@Component("homeCvn(id값을 부여)")=================>스프링컨테이너 HomeController2클래스
+                            객체를 만들어서 저장을 하는데
+ class HomeController2{      Main에서는 기본적으로 클래스이름을 기본
+                             으로 가져온다.
+                             getBean("homeCvn")
+}
+===================================================================
+
+
+
+
+

@@ -1,0 +1,87 @@
+6.spring의 MVC활용(게시판)-글목록보기,글쓰기
+
+초간단 게시판(자유게시판)->1.spring의 흐름(MVC)->모델2 방식
+                           2.JNDI방법->DBConnectionMgr.java
+-------------------------------------------------------------
+                           3.Annontaion->4.MyBatis(DB연동법)
+                           ------------->=====================
+
+초간단 게시판->SpringBoard->
+
+SpringBoard
+       |
+        -src
+       |
+         -WebContent->화면에 출력할 page(~)
+                 |
+                  -META-INF->**Context.xml(DB정보->태그형태로 설정)->명함철
+                 |
+                  -WEB-INF->1.web.xml(컨트롤러 등록)
+                            2.board-servlet.xml(요청명령어 등록)
+                         |
+                          -lib->spring 라이브러리 복사(0순위)
+
+
+1.web.xml에 등록
+
+ <servlet>
+    <servlet-name>board</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+  </servlet>
+  
+  <!-- 요청명령어를 등록(*.do~) -->
+  <servlet-mapping>
+     <servlet-name>board</servlet-name>
+     <url-pattern>*.do</url-pattern>
+  </servlet-mapping>
+
+2.board-servlet.xml  작성
+---------------------------------------------------------------------
+3.자유게시판(=공지사항 게시판)->테이블 생성
+     scott/tiger
+
+create table springboard(
+num number(3) primary key,  /* 게시물 번호 */
+author varchar2(15),    /* 작성자 */
+title varchar2(50),     /* 제목 */
+content varchar2(4000), /* 본문 내용 */
+writeday date default sysdate, /* 작성날짜 */
+readcnt number(4) default 0); /* 조회수 */
+
+insert into springboard(num,author,title,content) 
+        values(1,'홍길동','스프링 연습1','스프링 테스트 내용중');
+
+commit;
+
+select * from springboard;
+
+4.DBConnectionMgr.java (X)->Context.xml에서 DB정보를 저장
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+   <Resource name="jdbc/orcl"
+                    auth="container"
+                    type="javax.sql.DataSource"
+                    username="scott"
+                    password="tiger"
+                    driverClassName="oracle.jdbc.driver.OracleDriver"
+                    factory="org.apache.commons.dbcp.BasicDataSourceFactory"
+                    url="jdbc:oracle:thin:@localhost:1521:orcl"
+                    maxActive="20"
+                    maxIdle="10" />
+</Context>
+
+
+
+
+
+  BoardDTO.java
+  BoardDAO.java
+
+
+
+
+
+
+
+

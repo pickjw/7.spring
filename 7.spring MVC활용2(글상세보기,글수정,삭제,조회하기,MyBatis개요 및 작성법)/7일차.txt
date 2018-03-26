@@ -1,0 +1,370 @@
+7.Spring MVC활용2(글상세보기,글수정,삭제,조회하기,MyBatis개요 및 작성법)
+
+=>JNDI(게시판)=>** Mybatis로 DB연동**
+============================================================
+ SpringBoard(뼈대)->흐름+Mybatis(구조변경)+흐름+어노테이션+Maven
+ --------------------    -------                ---------- ------ 
+ ->다음주 목요일(발표),금요일(30일)4:30시->모바일,모델링 이론,,스프링 위주(서술형)            
+ ---------------------------------------------------------------
+ 1.글 상세보기
+
+ ->http://localhost:8090/SpringBoard/retrieve.do?num=2 ->list.jsp
+                                    ============
+ 1)board-servlet.xml에 요청명령어 등록
+  
+  <!--4.글상세보기(BoardDAO->retrieve()호출  -->
+<bean name="/retrieve.do" class="lee.RetrieveActionController">
+    <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+</bean>
+
+ 2)BoardDAO의 메서드 작성
+
+ //select * from springboard where num=2;
+	public BoardDTO retrieve(String num){ // 글상세보기 ->조회수 증가
+		BoardDTO data=new BoardDTO();
+		try {
+			//1.조회수증가
+		  String sql="update springboard set readcnt=readcnt+1 where num="+num;
+		  Connection con=ds.getConnection();
+		  PreparedStatement stmt=con.prepareStatement(sql);
+		  int update=stmt.executeUpdate(sql);
+		  System.out.println("조회수 증가유무(update)=>"+update);
+		  stmt=null;
+		  sql="select * from springboard where num="+num;
+		  stmt=con.prepareStatement(sql);
+		  ResultSet rs=stmt.executeQuery(sql);
+		  
+		  if(rs.next()) {
+			  data.setNum(rs.getInt("num"));
+			  data.setAuthor(rs.getString("author"));
+			  data.setTitle(rs.getString("title"));
+			  data.setContent(rs.getString("Content"));
+		  }
+		  rs.close(); stmt.close(); con.close();
+		}catch(Exception e) {e.printStackTrace();}
+		return data;
+	}//end retrieve
+----------------------------------------------------------------
+  https://docs.spring.io/spring/docs/4.2.9.RELEASE/javadoc-api/
+  ->ModelAndView
+
+ 3)RetrieveActionController작성
+
+  @Override
+	public ModelAndView handleRequest(HttpServletRequest request, 
+			                                                HttpServletResponse response) throws Exception {
+		// TODO Auto-generated method stub
+		System.out.println("RetrieveActionController 실행됨!");
+		//BoardDAO dao=new BoardDAO() (X)
+		String num=request.getParameter("num");
+		BoardDTO data=dao.retrieve(num);
+		//실행결과를 ModelAndView객체에 담아서 컨트럴러에 전달->페이지로 이동
+		ModelAndView mav=new ModelAndView("retrieve");
+		//mav.setViewName("retrieve");//retrieve.jsp  이동할 페이지 지정
+		//request.setAttribute("data",data);
+		mav.addObject("data",data); //${data} <%=request.getAttribute("data")%>
+		return mav;
+	}
+ 4)retrieve.jsp->웹상에 레코드한개를 출력(필드별로)
+------------------------------------------------------------------
+  <%@ page import="lee.*" %>
+<%
+     BoardDTO data=(BoardDTO)request.getAttribute("data");//${data}
+     int num=data.getNum();
+     String title=data.getTitle();
+     String author=data.getAuthor();
+     String content=data.getContent();
+%>
+-------------------------------------------------------------------
+=>index.jsp로 실행
+===================================================================
+2.글수정하기->글쓰기와 동일
+
+ 1)요청명령어 등록
+
+<bean name="/update.do" class="lee.UpdateActionController">
+     <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+     <property name="commandClass"  value="lee.BoardCommand" />
+</bean>
+
+ 2)BoardDAO의 update()메서드 작성
+
+ public void update( String num , String author, 
+			            String title , String content){ // 글수정하기
+	     try{
+		  String sql ="update springboard set title='" + title + "',";
+		  sql += " content='" + content+"',";
+		  sql += " author ='" + author+"'";
+		  sql += " where num=" + num;
+		  System.out.println(sql);
+
+		  Connection con = ds.getConnection();
+		  PreparedStatement stmt = con.prepareStatement(sql);  
+		  int update=stmt.executeUpdate(sql);
+		  System.out.println("게시판의 수정성공유무(update)=>"+update);
+		  stmt.close();  con.close();
+	     }catch(Exception e){e.printStackTrace();}
+	  }//end update
+-----------------------------------------------------------------
+ 3)UpdateActionController 작성->BoardDAO의 update()메서드 호출
+   -->/list.do=>ListActionController->list.jsp에서 보여준다.
+                     새로 DB접속->다시 반영->화면에 출력
+
+   ->WriteActionController와 소스코드가 동일(save as)
+
+protected ModelAndView handle(HttpServletRequest request, 
+		           HttpServletResponse response, Object command, 
+		           BindException error)  throws Exception {
+	// TODO Auto-generated method stub
+		request.setCharacterEncoding("utf-8");
+		BoardCommand data=(BoardCommand)command;
+		//추가
+		String num=request.getParameter("num");//기존의 num값이 전달
+		//-----------------------------------------------
+		String author=data.getAuthor();
+		String content=data.getContent();
+	    String title=data.getTitle();
+	    
+	    /* 전통방식
+	       String num=request.getParameter("num");
+	       String author=request.getParameter("author");
+		   String content=request.getParameter("content");
+	       String title=request.getParameter("title");
+	     * 
+	     */
+	    dao.update(num,author, title, content);//dao.write(data);
+	    //response.sendRedirect("list.jsp");->/list.do->ListActionController->list.jsp
+	    //형식) redirect:/요청명령어=>p308
+	   // ModelAndView mav=new ModelAndView("redirect:/list.do");
+	   //mav.setViewName("list");
+	  //return mav;
+	    return new ModelAndView("redirect:/list.do");
+  }
+}
+------------------------------------------------------------------
+  Controller를 상속->handleRequest(request,response)
+  AbstractCommandController를 상속(입력유무)->handle(request,response,,)
+------------------------------------------------------------------------
+  ->상속X (POJO 클래스)
+
+
+3.글삭제하기
+
+ 1)<a href="delete.do?num=<%= num %>">삭제</a>
+  board-servlet.xml에서 /delete.do==>lee.DeleteActionController등록
+
+ <!--6.글삭제하기 -->
+<bean name="/delete.do" class="lee.DeleteActionController">
+    <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+</bean>
+
+ 2)BoardDAO->delete()구현(작성)
+
+  //delete from springboard whre num=2
+   public void delete( String num){ //글삭제하기
+			try {
+			 String sql="delete from springboard whre num="+num;
+			 Connection con=ds.getConnection();
+			 PreparedStatement pstmt=con.prepareStatement(sql);
+			 int delete=pstmt.executeUpdate(sql);
+			 System.out.println("delete 삭제유무(delete)=>"+delete);
+			 pstmt.close();  con.close();
+			}catch(Exception e) {
+				System.out.println("delete()에러발생=>"+e);
+			}
+		}//end delete
+
+ 3)DeleteActionController->BoardDAO->delete()호출->데이터 삭제
+   
+  ->return new ModelAndView("redirect:/list.do");
+  ->RetrieveActionController를 save as
+
+  @Override
+	public ModelAndView handleRequest(HttpServletRequest request, 
+			                                                HttpServletResponse response) throws Exception {
+		// TODO Auto-generated method stub
+		System.out.println("DeleteActionController 실행됨!");
+		//BoardDAO dao=new BoardDAO() (X)
+		String num=request.getParameter("num");
+		dao.delete(num);
+		//실행결과를 ModelAndView객체에 담아서 컨트럴러에 전달->페이지로 이동
+		ModelAndView mav=new ModelAndView();
+		mav.setViewName("redirect:/list.do");//요청명령어->처리 페이지이동
+		//mav.setViewName("list");//새로고침 기능X->단순히 페이지이동
+		return mav;
+	}
+==============================================================
+   게시판의 글삭제하기폴더->실행화면 화면캡처->DeleteActionController.java
+                                               저장
+==================================================================
+12:20 마무리
+=============>
+ 글검색하기
+
+ 1.list.jsp에서 검색분야 추가
+
+<!-- 검색 기능 시작 -->
+	<tr><td colspan="5" align="center">
+		<form action="search.do">
+		   <select name="searchName" size="1">
+                           =================(검색분야)
+	          <option value="author">작성자</option>
+    	          <option value="title">제목</option>
+                 </select>
+		   <input type="text" name="searchValue"><input type="submit" value="검색">
+		    ======================================(검색어)
+               </form>
+	</td></tr>
+
+모델2->ListActionController에서 2개의 매개변수를 입력->처리
+     ->스프링->새로 Controller를 작성->처리
+===================================================================
+  2.board-servlet.xml에서 추가(search.do)
+
+<!--7.글검색하기  -->
+<bean name="/search.do" class="lee.SearchActionController">
+    <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+</bean>
+
+ 3.BoardDAO의 search(searchName,searchValue)메서드 작성->정리
+
+//name(검색분야) ,value(검색어)
+	  // public ArrayList<BoardDTO> search( String name , String value ){ 
+	  public ArrayList search( String name , String value ){ 
+		    ArrayList list = new ArrayList();
+		    // List list = new ArrayList();
+		    try{
+		  	  String sql = "SELECT * FROM springboard";
+			  sql += " WHERE  " + name + " LIKE  '%" + value + "%' "; 
+			  System.out.println( sql );
+		  
+			      Connection con = ds.getConnection();
+		    	  PreparedStatement stmt = con.prepareStatement(sql);
+		    	  ResultSet rs = stmt.executeQuery( sql );
+		    	  while( rs.next()){//찾은 레코드가 한개이상이라도
+		    		BoardDTO data = new BoardDTO();
+		    		data.setNum(rs.getInt( "num" ));
+		    		data.setAuthor(rs.getString( "author" ));
+		    		data.setTitle(rs.getString( "title"));
+		    		data.setContent(rs.getString( "content" ));
+		    		data.setDate(rs.getString( "writeday" ));
+		    		data.setReadcnt(rs.getInt( "readcnt" ));
+		    		list.add( data );
+		    	  }
+		    	  rs.close();	stmt.close(); con.close();
+		    	}catch( Exception e){ e.printStackTrace();}
+		    	return list;
+    }
+
+ 4.SearchActionController->search(~)호출
+
+@Override
+	public ModelAndView handleRequest(HttpServletRequest request, 
+			                                                HttpServletResponse response) throws Exception {
+		// TODO Auto-generated method stub
+		System.out.println("SearchActionController 실행됨!");
+		//2개의 매개변수(검색분야,검색어)
+		String searchName=request.getParameter("searchName");
+		String searchValue=request.getParameter("searchValue");
+		ArrayList list=dao.search(searchName,searchValue);
+		//----------------------------------------------------------------
+		ModelAndView mav=new ModelAndView();
+		mav.setViewName("list");//list.jsp  이동할 페이지 지정
+		//request.setAttribute("list",list);
+		mav.addObject("list",list); //${list} <%=request.getAttribute("list")%>
+		return mav;
+	}
+
+ 5->검색된 레코드만 객체에 담아서 화면에 출력->list.jsp
+------------------------------------------------------------------
+  SpringBoard=>SpringMyBatis 프로젝트이름을 변경
+===============================================
+
+SpringMybatis(뼈대)+Mybatis(환경설정)=>DB연동
+
+Mybatis-->xml파일을 이용해서 SQL관리(DB관리를) 해주는 프레임워크
+
+       -->프레임워크->Spring,MyBatis,Angular,Spring tiles(개발환경 제공툴)
+          라이브러리->React
+
+   ->간단한 XML서술자를 사용해서
+     간단하게 자바빈즈를 SQL statement에 매핑시키는 ORM 프레임워크
+             클래스                      (연결)
+----------------------------------------------------------------
+** 장점 **
+============
+
+ibatis=>Mybatis=>JDBC Programming(20~30%정도 코딩양이 줄어듬)
+                      ->개발시간이 단축(경제성)
+
+       =>이식성도 뛰어남
+
+1.XML로 SQL을 관리하므로 가독성이 높아진다.->소스코드를 이해하기 쉽다
+                                           -><insert>,<select>
+
+2.JDBC 드라이버가 있다면 어떤 DB에서도 사용이 가능하다.
+3.DB연결 정보의 관리가 용이하다.----------------------->xml파일이용
+4.JavaBean 스타일의 클래스를 지원한다.->매개변수,반환형을 이용
+
+5.여러 개의 DB에 접근이 쉽다.
+6.Map,Collection,List와 기본형의 래퍼클래스를 사용->매개변수,반환형으로
+                                                    사용
+(Integer,String등)을 지원한다.->매개변수,반환형으로
+7.복잡한 객체 모델등을 쉽게 생성한다.->테이블의 필드
+
+
+** 단점**
+
+   환경설정이 복잡하고 어렵다.
+-------------------------------------------------------------------
+SpringMyBatis 프로젝트
+-----------------------
+
+0.lib폴더에 Mybatis를 사용할 수있도록 관련된 jar파일을 복사
+
+1.DB연동에 관련된 파일을 xml로 불러올 수 있도록 환경설정하자.
+  ppt순서 1,2,3->jdbc.properties파일을 불러오는 순서
+  ---------------------------------------------------------
+  1) jdbc.properties 파일설정
+
+#key.name=value
+jdbc.driverClassName=oracle.jdbc.driver.OracleDriver
+jdbc.url=jdbc:oracle:thin:@localhost:1521:orcl
+jdbc.username=scott
+jdbc.password=tiger
+================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

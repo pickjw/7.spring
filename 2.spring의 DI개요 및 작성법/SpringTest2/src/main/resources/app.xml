@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd">
+
+<!-- SystemMoniter클래스의 setPeriodTime메서드를 호출하면서
+        10(매개변수)을 전달 
+         p:멤버변수명="저장할값" p:멤버변수-ref="참조할 상대방 빈즈의 id"
+        -->
+<bean id="moniter"  class="spring3.SystemMoniter"
+           p:periodTime="20" p:sender-ref="smsSender">
+     <!-- <property name="periodTime">
+         <value>10</value>
+     </property>
+     <property name="sender">
+        <ref bean="smsSender" />
+     </property> -->
+</bean>
+
+<bean id="smsSender"  class="spring3.SmsSender" />
+
+
+
+</beans>

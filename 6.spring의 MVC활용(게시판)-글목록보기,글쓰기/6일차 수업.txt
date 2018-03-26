@@ -1,0 +1,355 @@
+6.spring의 MVC활용(게시판)-글목록보기,글쓰기
+
+초간단 게시판(자유게시판)->1.spring의 흐름(MVC)->모델2 방식
+                           2.JNDI방법->DBConnectionMgr.java
+-------------------------------------------------------------
+                           3.Annontaion->4.MyBatis(DB연동법)
+                           ------------->=====================
+
+초간단 게시판->SpringBoard->
+
+SpringBoard
+       |
+        -src
+       |
+         -WebContent->화면에 출력할 page(~)
+                 |
+                  -META-INF->**Context.xml(DB정보->태그형태로 설정)->명함철
+                 |
+                  -WEB-INF->1.web.xml(컨트롤러 등록)
+                            2.board-servlet.xml(요청명령어 등록)
+                         |
+                          -lib->spring 라이브러리 복사(0순위)
+
+
+1.web.xml에 등록
+
+ <servlet>
+    <servlet-name>board</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+  </servlet>
+  
+  <!-- 요청명령어를 등록(*.do~) -->
+  <servlet-mapping>
+     <servlet-name>board</servlet-name>
+     <url-pattern>*.do</url-pattern>
+  </servlet-mapping>
+
+2.board-servlet.xml  작성
+---------------------------------------------------------------------
+3.자유게시판(=공지사항 게시판)->테이블 생성
+
+create table springboard(
+num number(3) primary key,
+author varchar2(15),
+title varchar2(50),
+content varchar2(4000),
+writeday date default sysdate,
+readcnt number(4) default 0);
+
+insert into springboard(num,author,title,content) 
+                values(1,'홍길동','스프링 연습1','스프링 테스트 내용중');
+
+commit;
+
+select * from springboard;
+
+xml파일에 DB접속에 관련된 정보를 저장시켜서 DB에 연결시키는 방법
+-->JNDI방법(Java Naming Directory Interface)->이름을 이용->검색
+4.
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+   <Resource name="jdbc/orcl" ==>외부에서 찾는 이름(BoardDAO)
+                    auth="container"
+                      ->리소스(자원(DB)를 누가 관리할 것인가? 스프링)
+                    type="javax.sql.DataSource"
+                      ->커넥션풀에 대한 DataSourece의 fullName(자료형)
+                    username="scott"  ->접속계정명
+                    password="tiger"  ->접속할 암호명
+                    driverClassName="oracle.jdbc.driver.OracleDriver"
+                      ->접속할 Driver명
+                    factory="org.apache.commons.dbcp.BasicDataSourceFactory"
+                     ->커넥션풀을 생성해주는 클래스 fullName
+                    url="jdbc:oracle:thin:@localhost:1521:orcl"
+                     ->접속 url
+                    maxActive="20"->최대로 빌려줄 수 있는 커넥션풀 갯수를 
+                                    지정해주는 속성->부족하면 갯수를 늘린다.
+                    maxIdle="10" />->최대로 여분이 있는 커넥션풀 갯수를
+                                     지정해주는 속성값
+</Context>
+
+5.BoardDTO작성
+
+public class BoardDTO {
+	
+	private int num;// 게시물 번호
+	private String author, title, content, date;// 작성날짜->String
+	private int readcnt;// 조회수
+
+	public int getNum() {
+		
+        return num;
+	}
+         ,,,,
+
+6.BoardDAO 작성->배포->수정할것 수정하고 입력할것 입력->저장
+
+//----추가(JNDI 방식)-----------------------------------------
+import javax.sql.*;//DataSource객체->getConnection()
+import javax.naming.*;//Context(인터페이스),InitialContext객체
+                                    //lookup(java:comp/env/찾고자하는 이름(JNDI명))
+                                    //ex)~lookup("java:comp/env/jdbc/orcl")
+//---------------------------------------------------------------
+public class BoardDAO{
+       DataSource ds;     //DBConnectionMgr pool=null;
+       
+   //생성자->DataSource ds 얻어오는 구문->InitialContext와 JNDI명 부여
+   public BoardDAO(){
+		try {
+			//pool=DBConnectionMgr.getInstance();
+			//InitialContext ctx=new InitialContext();
+			Context ctx=new InitialContext();
+			//lookup(java:comp/env/찾고자하는 이름(JNDI명))
+			ds=(DataSource)ctx.lookup("java:comp/env/jdbc/orcl");
+			System.out.println("ds=>"+ds);
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+ //public List list(){}
+	public ArrayList  list(){  // 글목록보기(레코드 한개이상)
+		
+		ArrayList list = new ArrayList();//여러개의 레코드를 담을 객체선언
+		
+		try{
+			String sql = "SELECT * FROM springboard ORDER BY num desc";
+			Connection con = ds.getConnection();
+			//Connection con = pool.getConnection();
+			PreparedStatement stmt = con.prepareStatement(sql);
+			ResultSet rs = stmt.executeQuery();
+			
+			while(rs.next()){
+				BoardDTO data = new BoardDTO();
+				data.setNum( rs.getInt( "num" ) );
+				data.setAuthor(rs.getString( "author" ));
+				data.setTitle(rs.getString( "title"));
+				data.setContent(rs.getString( "content" ));
+				data.setDate(rs.getString( "writeday" ));//작성날짜->String
+				data.setReadcnt(rs.getInt( "readcnt" ));
+				list.add( data );
+			}//end while
+			rs.close();	stmt.close(); con.close();//약어
+		}catch(Exception e){ e.printStackTrace(); }
+		return  list;
+	}//end list
+============================================================
+ 사용자가 어떻게 요청할때 현재 list.jsp를 화면에 보여줄것인가?
+
+모델2->commandPro.properties-> /list.do=action.ListAction
+
+ =>7.board-servlet.xml에서 처리(요청명령어 등록)
+
+<!-- 0.DB접속방법(BoardDAO객체)->JNDI방법  -->
+<bean id="boardDAO"  class="lee.BoardDAO" />
+
+<!--1.글목록보기  -->
+<bean name="/list.do" class="lee.ListActionController">
+     <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+</bean>
+
+8.ListActionController 작성
+
+@Override
+	public ModelAndView handleRequest(HttpServletRequest request, 
+			                                                HttpServletResponse response) throws Exception {
+		// TODO Auto-generated method stub
+		System.out.println("ListActionController 실행됨!");
+		//BoardDAO dao=new BoardDAO() (X)
+		ArrayList list=dao.list();
+		ModelAndView mav=new ModelAndView();
+		mav.setViewName("list");//list.jsp  이동할 페이지 지정
+		//request.setAttribute("list",list);
+		mav.addObject("list",list); //${list} <%=request.getAttribute("list")%>
+		return mav;
+	}
+
+9.jsp파일->배포->list.jsp,retrieve.jsp,write.jsp->WebContent에 복사
+ <%
+    ArrayList list=(ArrayList)request.getAttribute("list"); //${list}
+    if(list!=null){  //꺼내온 데이터가 들어가 있다면
+    	Iterator iter=list.iterator();
+        while(iter.hasNext()){ //꺼내올 데이터가 들어가 있다면
+        	BoardDTO data=(BoardDTO)iter.next();
+            int num=data.getNum();
+            String title=data.getTitle();
+            String author=data.getAuthor();
+            String content=data.getContent();
+            String writeday=data.getDate();//날짜 출력시->외국스타일
+            int readcnt=data.getReadcnt();
+%>
+
+10.index.jsp에서 요청명령어를 실행->링크걸기
+--------------------------------------------------------------------
+<%
+response.sendRedirect("http://localhost:8090/SpringBoard/list.do");
+%>
+
+
+스프링 관련 API 사이트 위치
+
+http://gardentree.tistory.com/21
+-------------------------------------------------------------
+게시판의 글쓰기->글수정하기(Save as)
+---------------
+
+1)글쓰기 폼으로 단순히 페이지를 이동->이미 존재하는 액션클래스를
+                                      연결만 시키자
+
+<a href="writeui.do">글쓰기</a>
+
+<bean name="/writeui.do" 
+   class="org.springframework.web.servlet.mvc.ParameterizableViewController">
+     <property name="viewName" value="write"></property>
+</bean>
+
+<!--3.글쓰기(글수정하기와 거의 유사) write.do -->
+<bean name="/write.do" class="lee.WriteActionController">
+     <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+     <property name="commandClass"  value="lee.BoardCommand" />
+</bean>
+
+2)글쓰기 해주는 역할->WriteActionController->save as
+                                         UpdateActionController
+----------------------------------------------------------------
+BoardCommand
+
+package lee;
+
+//BoardDTO와 같은 역할을 한다.(테이블의 필드와 연결)
+//사용자로부터 순수 입력받는값만 처리해주는 클래스
+
+public class BoardCommand {
+    private String author,title,content;
+
+	public String getAuthor() {
+		return author;
+	}
+    ,,,
+=====================================================
+3.WriteActionController->write()->BoardDAO->write(author,title,
+                                                 content)
+
+ ->글쓰기 성공->ListActionController->list.jsp
+------------------------------------------------------------
+    BoardDAO
+//select max(num) from springboard->1+1=2+1=3
+	public int getNewNum(){ //글쓰기 번호 얻기->
+	    int newNum=1;//저장할 게시물번호
+	    try {
+	    	String sql="select max(num) from springboard";
+	    	Connection con=ds.getConnection();
+	    	PreparedStatement stmt=con.prepareStatement(sql);
+	    	ResultSet rs=stmt.executeQuery(sql);
+	    	if(rs.next()) {
+	    		newNum=rs.getInt(1)+1;
+	    	}
+	    }catch(Exception e) {e.printStackTrace();}
+		return newNum;
+	}//end getNewNum();
+	  
+	public void write(String author, String title , String content){
+		try{ //보안때문에 ?로 입력을 받아야 된다.
+			int newNum = getNewNum();
+			String sql ="insert into springboard(num,author,title,content) values(";
+			sql +=  newNum + ",'" + author + "','" + title + "','" + content + "')";
+			System.out.println(sql);
+			
+	  	  	Connection con = ds.getConnection();
+	  	  	PreparedStatement stmt = con.prepareStatement(sql);
+	  	  	stmt.execute(sql);//stmt.executeUpdate(sql)
+	  	  	stmt.close(); con.close();
+	  	}catch(Exception e ) {e.printStackTrace();}
+	}//end write
+--------------------------------------------------------------------	
+스프링에서 기본적으로 요청을 받아서 처리
+
+1.Controller을 상속받는 경우->default(대부분)->글목록보기,글상세보기
+ (인터페이스)                                            ->글삭제하기,,,
+
+***** 2.AbstractCommandController을 상속받는 경우(추상클래스)*****
+  (사용자로부터 값을 입력을 받는 경우)->글쓰기,글수정하기
+
+package lee;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.validation.BindException;
+import org.springframework.web.servlet.ModelAndView;
+//2.5대->3.X에서 없어짐
+import org.springframework.web.servlet.mvc.AbstractCommandController;
+
+//사용자로부터 값을 주로 입력을 받아서 처리해주는 컨트롤러클래스
+public class WriteActionController extends AbstractCommandController {
+	
+	BoardDAO dao;//BoardDAO dao=new BoardDAO() (X)->write()
+
+	public void setDao(BoardDAO dao) {
+		this.dao = dao;
+		System.out.println("setDao() 호출됨(dao)->"+dao);
+	}
+
+	//1.request(요청객체) 2.response(응답객체) 
+	//3.입력받은값을 따로 저장한객체( Object command(어떠한 자료형도 다저장)->Model)
+    // <jsp:setProperoty property="*" />역할
+	//4.BindException->사용자로부터 값을 입력시 에러발생->처리해주는 객체
+	@Override
+protected ModelAndView handle(HttpServletRequest request, 
+		           HttpServletResponse response, Object command, 
+		           BindException error)  throws Exception {
+	// TODO Auto-generated method stub
+		request.setCharacterEncoding("utf-8");
+		BoardCommand data=(BoardCommand)command;
+		String author=data.getAuthor();
+		String content=data.getContent();
+	    String title=data.getTitle();
+	    
+	    /* 전통방식
+	     * String author=request.getParameter("author");
+		   String content=request.getParameter("content");
+	       String title=request.getParameter("title");
+	     * 
+	     */
+	    dao.write(author, title, content);//dao.write(data);
+	    //response.sendRedirect("list.jsp");->/list.do->ListActionController->list.jsp
+	    //*** 형식) redirect:/요청명령어 ***
+	    ModelAndView mav=new ModelAndView("redirect:/list.do");
+	    //mav.setViewName("list");
+	return mav;
+  }
+}
+
+==================================================================
+<최종 실행 결과>
+
+setAuthor()메서드 호출됨!
+setContent()메서드 호출됨!
+setTitle()메서드 호출됨!
+insert into springboard(num,author,title,content) values(2,'테스트','글쓰기','스프링으로 글쓰기 연습중입니다.ㅁ
+ㅁㅇ
+ㅇㅁ
+ㅇㅁㅇ
+ㅁㅇㅁ
+ㅇㅁㄴ
+ㅇㅁㄴ
+ㅇㅁㄴ
+ㅁㅇㄴ')
+ListActionController 실행됨!
+
+
+

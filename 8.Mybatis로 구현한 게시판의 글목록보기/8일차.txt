@@ -1,0 +1,282 @@
+8.Mybatis로 구현한 게시판의 글목록보기
+
+->두과목 (개발자테스트,어플리케이션 테스트수행)
+->스프링 (서술형->환경설정 방법,소스코드)
+-----------------------------------------------
+
+1.lib->스프링 라이브러리 복사할것->maven다시 재설정
+2.WEB-INF\jdbc.properties파일을 작성
+
+#key.name=value
+jdbc.driverClassName=oracle.jdbc.driver.OracleDriver
+jdbc.url=jdbc:oracle:thin:@localhost:1521:orcl
+jdbc.username=scott
+jdbc.password=tiger
+
+3.data-AccessContext-local.xml파일을 구성하는 태그는 ->전세계 표준
+  약속이 되어있는 선언문->DTD 선언문
+
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN"
+ "http://www.springframework.org/dtd/spring-beans-2.0.dtd" >
+
+<!-- 1./WEB-INF/jdbc.properties 파일불러오기
+ PropertyPlaceholderConfigurer->외부파일 불러올때 사용
+ setlocations("WEB-INF/jdbc.properties")을 호출
+ ->메모리에 올린다.
+-->
+<bean id="propertyConfigurer"  
+        class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+  <property name="locations">
+    <list>
+       <value>WEB-INF/jdbc.properties</value>
+    </list>
+  </property>
+</bean>
+
+<!--  2.jdbc.properties파일에서 원하는 속성값을 불러오기 ${키명}-->
+<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+   <property name="driverClassName" value="${jdbc.driverClassName}" />
+   <property name="url" value="${jdbc.url}" />
+   <property name="username" value="${jdbc.username}" />
+   <property name="password" value="${jdbc.password}" />
+</bean>
+
+<!--  
+  (Mybatis)bean 등록(SqlSessionFactoryBean)
+  1)configLocation->테이블에 대한 xml정보파일을 불러올때
+  2)dataSource->DB연결정보 멤버변수
+  SqlSessionTemplate(sqlSession객체를 얻어오는 구문)
+   p566
+   SqlSessionFactoryBean=>mybatis를 이용해서 DB에 접속해서 사용할 수
+                         있는 객체와 연관이 있는 클래스
+-->
+<bean id="sqlSessionFactory" 
+          class="org.mybatis.spring.SqlSessionFactoryBean">
+      <property name="configLocation" value="WEB-INF/SqlMapConfig.xml " />
+      <property name="dataSource"  ref="dataSource" />
+</bean>
+ p567
+<bean id="sqlSessionTemplate"
+          class="org.mybatis.spring.SqlSessionTemplate">
+          <constructor-arg index="0" ref="sqlSessionFactory" />
+ </bean>
+
+4.web.xml에서 data~.xml파일을 불러올 수 있도록 환경설정
+
+<!-- 1.외부의 DB설정에 관련된 파일  불러오기
+     param-name->매개변수명(경로포함해서 불러올 파일명)
+     param-value->경로포함해서 불러올 DB에 관련된 파일명
+    -->
+  <context-param>
+     <param-name>contextConfigLocation(매개변수명)고정</param-name>
+     <param-value>/WEB-INF/dataAccessContext-local.xml
+                 경로포함해서 불러올 DB에 관련된 파일명(상대경로)
+           </param-value>
+  </context-param>
+  
+  <!--외부의 파일을 불러올때 사용되는 클래스를 등록  -->
+  <listener>
+     <listener-class>
+         org.springframework.web.context.ContextLoaderListener
+     </listener-class>
+  </listener>
+
+------>DB연결하는것 까지의 환경설정-------------------------
+
+5.접속해서 어떤 테이블을 가지고 SQL구문을 이용해서 DB관리(설정)
+ SqlMapConfig.xml파일 편집
+
+<configuration>
+ 
+ <!-- 
+    typeAliases은 생략가능(패키지가 긴 DTO클래스이름의 별칭을 부여할때 사용)
+    typeAlias 태그등록->별칭을 등록(패키지명이 긴 자바빈즈파일(~DTO)
+    type->"패키지명....클래스명(~DTO)  alias="별칭명"
+  -->
+  <typeAliases>
+     <typeAlias type="lee.BoardCommand"  alias="board"/>
+     <typeAlias type="lee.aa.bb.cc.dd.MemberDTO"  alias="mem"/>
+     ,,,
+  </typeAliases>
+  
+  <!-- mappers태그는 필수(불러올 테이블의 정보를 가진 xml파일 갯수만큼을
+         지정할때 사용하는 태그정보
+         mapper태그(resource=불러올 파일명을 나열)(springboard)
+          ex) lee.Board.xml
+   -->
+   <mappers>
+        <mapper  resource="lee/Board.xml"/>
+        <mapper  resource="lee/Sangpum.xml"/>
+        <mapper  resource="lee/Member.xml"/>
+        ,,,
+   </mappers>
+ 
+ </configuration>
+----------------------------------------------------------
+6.lee/Board.xml파일 작성->SQL관리하기위해서 이 파일을 생성
+
+** 기본 속성 **
+<select|insert|update|delete id="" parameterType="" resultType="">
+  실행시킬 SQL구문(대소문자 구분X ->테이블명,예약어->대문자를 보통
+                                                     사용)
+</select|insert|update|delete>
+
+1.id-->sql구문의 종류에 상관없이 각각의 sql구분자(필수)
+
+<select id="sql구분인자(imsi)">
+   select * from springboard order by num desc
+</select>
+
+<select id="test">
+
+</select>
+
+2.parameterType속성=>특정 sql구문을 실행시킬때 매개변수로 전달할
+                      필요가 있을때 사용
+                  parameterType="java.lang.Integer"
+                  parameterType="Integer"
+                  parameterType="int"
+                  parameterType="lee.aa.bb.cc.dd.BoardCommand"
+                                  board(별칭)
+
+ex) select * from springboard where num=2=>? #{매개변수} 
+                              ===========      ========
+                                          DTO의 멤버변수이름과 동일
+                  <jsp:setProperty ~property="*" />
+    insert into ~values(#{필드명},,,
+
+    update springboard set title=#{title}
+    delete from springboard where num=#{num}
+                                     ========
+
+3.resultType=>SQL구문을 실행시켰을때 반환값이 필요한 경우 사용
+
+  =>select * from springboard->lee.BoardCommand
+  =>insert,update,delete->parameterType위주 ,resultType 보통X
+===============================================================
+ =><select id="list" resultType="board">
+    select * from springboard order by num desc
+   </select>
+----------------------------------------------------------------
+7.lee.BoardCommand->내용 수정(BoardDTO대신에 사용하기위해서)
+
+public class BoardCommand {
+	//추가
+	private int num;
+    private String author,title,content;
+    //추가
+    private String writeday;//작성날짜
+    private int readcnt;//조회수
+    
+    //검색분야,검색어->HashMap을 가지고 작업(다음주 페이징처리하면서 같이작업)
+    private String searchName;
+    private String searchValue;
+    //
+    public int getNum() {
+		return num;
+	}
+   ,,,,
+----------------------------------------------------------
+8.DB연결된 부분=>웹에서의 출력하는 부분(환경설정부분)
+
+import org.springframework.dao.DataAccessException;
+
+//게시판에서 자주 사용이 되는 공통의 추상 메서드 선언->작업
+public interface BoardDAO{
+	
+	//1.글목록보기
+	public List list() throws DataAccessException;
+	
+	//2.최대값 구하기
+	//3.글쓰기
+	//4.글상세보기
+	//5.글수정하기
+	//6.글삭제하기
+	//7.글검색하기
+}
+
+9.BoardDAO인터페이스를 상속받아서 Mybatis를 이용해서 DB접속해서
+  SQL구문을 실행->메서드를 위해서 클래스 작성
+
+   SqlMapBoardDao클래스
+
+public class SqlMapBoardDao extends SqlSessionDaoSupport 
+                                            implements BoardDAO {
+     //@Inject or @Autowired
+	//private SqlSession sqlSession;->객체를 넣어주는 멤버변수선언->getSqlSession()
+	
+	@Override
+	public List list() throws DataAccessException {
+		// TODO Auto-generated method stub
+		//형식)sqlSession객체명.selectOne(실행시킬 sql구문의 id값,매개변수)->레코드한개
+		//형식)sqlSession객체명.selectList(실행시킬 sql구문의 id값,매개변수)->레코드여러개
+		/*
+		List list=getSqlSession().selectList("list");//전달할 매개변수가 없으면 생략
+		return list;*/
+		return getSqlSession().selectList("list");
+	}
+=================================================================
+**** 10.요청명령어에 따라서 DB연결->Mybatis와 연결하는 부분
+      board-servlet.xml에서 연결구문************************
+
+<!-- 
+    before
+<bean id="boardDAO"  class="lee.BoardDAO" />
+ -->
+                          SqlSessionDaoSupport클래스를 상속(자식클래스)
+<bean id="boardDAO"  class="lee.SqlMapBoardDao">
+   <property name="sqlSessionFactory" ref="sqlSessionFactory" />
+</bean>            =================       ==================
+                                            Mybatis에 관련된 클래스의
+                                             id값을 참조
+
+                   멤버변수=>setSqlSessionFactory()
+
+<!--1.글목록보기  -->
+<bean name="/list.do" class="lee.ListActionController">
+     <property name="dao">
+         <ref bean="boardDAO" />
+     </property>
+</bean>
+
+11.ListActionController 소스코드 수정
+
+@Override
+	public ModelAndView handleRequest(HttpServletRequest request, 
+			                                                HttpServletResponse response) throws Exception {
+		// TODO Auto-generated method stub
+		System.out.println("ListActionController 실행됨!");
+		//BoardDAO dao=new BoardDAO() (X)
+		//ArrayList list=dao.list();-----------------
+		List list=dao.list();
+                //------------------------------------------
+		ModelAndView mav=new ModelAndView();
+		mav.setViewName("list");//list.jsp  이동할 페이지 지정
+		//request.setAttribute("list",list);
+		mav.addObject("list",list); //${list} <%=request.getAttribute("list")%>
+		return mav;
+	}
+===============================================================
+
+12.list.jsp 소스코드 수정
+
+while(iter.hasNext()){ //꺼내올 데이터가 들어가 있다면
+        	//BoardDTO data=(BoardDTO)iter.next();
+            BoardCommand data=(BoardCommand)iter.next();
+            //---------------------------------------------------------
+            int num=data.getNum();
+            String title=data.getTitle();
+            String author=data.getAuthor();
+            String content=data.getContent();
+            //----------------------------------------------------------
+            String writeday=data.getWriteday();//날짜 출력시->외국스타일
+            //-----------------------------------------------------------
+            int readcnt=data.getReadcnt();
+
+13.index.jsp->SpringBoard=>SpringMybatis로 변경(프로젝트명)
+==================================================================
+<%
+response.sendRedirect("http://localhost:8090/SpringMyBatis/list.do");
+%>                                           ==============
+===================================================================
+
